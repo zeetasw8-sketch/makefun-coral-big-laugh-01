@@ -2,48 +2,65 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MAX_JOKE_LENGTH = 200;
-const SENTENCE_TERMINATORS = /[.!?]/;
+const ONE_LINE_LIMIT = 200;
+const END_MARKS = /[.!?]/;
 
-function fail(message: string): never {
-  throw new Error(message);
+function abort(reason: string): never {
+  throw new Error(reason);
 }
 
-function checkJokeLength(joke: string): void {
-  if (joke.length === 0 || joke.length > MAX_JOKE_LENGTH) {
-    fail("line must be 1-200 characters");
+function ensureNotBlank(text: string): void {
+  if (text.length === 0) {
+    abort("line must not be empty");
   }
 }
 
-function countSentences(joke: string): number {
-  return joke.split(SENTENCE_TERMINATORS).filter((part) => part.length > 0).length;
-}
-
-function checkSingleSentence(joke: string): void {
-  if (countSentences(joke) !== 1) {
-    fail("line must be a single sentence");
+function ensureWithinLimit(text: string): void {
+  ensureNotBlank(text);
+  if (text.length > ONE_LINE_LIMIT) {
+    abort("line must be 1-200 characters");
   }
 }
 
-function loadJokeLine(sourceDir: string): string {
-  const raw = readFileSync(join(sourceDir, "entry.txt"), "utf8");
-  const joke = raw.trim();
-  checkJokeLength(joke);
-  checkSingleSentence(joke);
-  return joke;
+function sentenceFragments(text: string): string[] {
+  return text.split(END_MARKS).filter((fragment) => fragment.length > 0);
 }
 
-function publishJoke(joke: string, destinationDir: string): void {
-  mkdirSync(destinationDir, { recursive: true });
-  writeFileSync(join(destinationDir, "entry.txt"), joke);
+function isSingleSentence(text: string): boolean {
+  return sentenceFragments(text).length === 1;
 }
 
-function run(): void {
-  const projectDir = dirname(fileURLToPath(import.meta.url));
-  const destinationDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-  const joke = loadJokeLine(projectDir);
-  publishJoke(joke, destinationDir);
-  console.log(joke);
+function ensureSingleSentence(text: string): void {
+  if (!isSingleSentence(text)) {
+    abort("line must be a single sentence");
+  }
 }
 
-run();
+const LINE_CHECKS: Array<(text: string) => void> = [
+  ensureWithinLimit,
+  ensureSingleSentence,
+];
+
+function readLineFrom(rootDir: string): string {
+  const raw = readFileSync(join(rootDir, "entry.txt"), "utf8");
+  const line = raw.trim();
+  for (const check of LINE_CHECKS) {
+    check(line);
+  }
+  return line;
+}
+
+function emitLine(line: string, outputDir: string): void {
+  mkdirSync(outputDir, { recursive: true });
+  writeFileSync(join(outputDir, "entry.txt"), line);
+}
+
+function main(): void {
+  const rootDir = dirname(fileURLToPath(import.meta.url));
+  const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+  const line = readLineFrom(rootDir);
+  emitLine(line, outputDir);
+  console.log(line);
+}
+
+main();
