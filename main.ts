@@ -1,12 +1,49 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-const line = readFileSync(join(here, "entry.txt"), "utf8").trim();
-if (line.length === 0 || line.length > 200) throw new Error("line must be 1-200 characters");
-if (line.split(/[.!?]/).filter(Boolean).length !== 1) throw new Error("line must be a single sentence");
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "entry.txt"), line);
-console.log(line);
+const MAX_JOKE_LENGTH = 200;
+const SENTENCE_TERMINATORS = /[.!?]/;
+
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+function checkJokeLength(joke: string): void {
+  if (joke.length === 0 || joke.length > MAX_JOKE_LENGTH) {
+    fail("line must be 1-200 characters");
+  }
+}
+
+function countSentences(joke: string): number {
+  return joke.split(SENTENCE_TERMINATORS).filter((part) => part.length > 0).length;
+}
+
+function checkSingleSentence(joke: string): void {
+  if (countSentences(joke) !== 1) {
+    fail("line must be a single sentence");
+  }
+}
+
+function loadJokeLine(sourceDir: string): string {
+  const raw = readFileSync(join(sourceDir, "entry.txt"), "utf8");
+  const joke = raw.trim();
+  checkJokeLength(joke);
+  checkSingleSentence(joke);
+  return joke;
+}
+
+function publishJoke(joke: string, destinationDir: string): void {
+  mkdirSync(destinationDir, { recursive: true });
+  writeFileSync(join(destinationDir, "entry.txt"), joke);
+}
+
+function run(): void {
+  const projectDir = dirname(fileURLToPath(import.meta.url));
+  const destinationDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+  const joke = loadJokeLine(projectDir);
+  publishJoke(joke, destinationDir);
+  console.log(joke);
+}
+
+run();
