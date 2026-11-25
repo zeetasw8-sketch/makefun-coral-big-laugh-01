@@ -15,11 +15,15 @@ function ensureNotBlank(text: string): void {
   }
 }
 
-function ensureWithinLimit(text: string): void {
-  ensureNotBlank(text);
+function ensureLengthWithinLimit(text: string): void {
   if (text.length > ONE_LINE_LIMIT) {
     abort("line must be 1-200 characters");
   }
+}
+
+function ensureWithinLimit(text: string): void {
+  ensureNotBlank(text);
+  ensureLengthWithinLimit(text);
 }
 
 function sentenceFragments(text: string): string[] {
